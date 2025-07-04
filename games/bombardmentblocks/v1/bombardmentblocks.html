@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bombardment Blocks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB 0%, #FFD700 100%); /* Sky blue to sunny yellow */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Align items to the start for top positioning */
+            min-height: 100vh;
+            margin: 0;
+            overflow-y: auto; /* Allow scrolling if content overflows */
+        }
+        #gameContainer {
+            border: 2px solid #333;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden; /* Clip canvas if it somehow overflows */
+            margin-top: 10px; /* Add some space above the game canvas */
+        }
+        canvas {
+            display: block;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 1200px; /* Match canvas width */
+            padding: 10px 0;
+            margin-top: 10px; /* Add some space above score */
+        }
+        .score-display {
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #controlsInfoTop { 
+            width: 100%;
+            max-width: 1200px; 
+            padding: 10px 0;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-top: 10px; 
+            margin-bottom: 10px; 
+            font-size: 0.9em;
+        }
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 2em;
+            text-align: center;
+            z-index: 100;
+            display: none; /* Hidden by default */
+        }
+    </style>
+</head>
+<body>
+    <h1 class="text-4xl font-bold text-gray-800 my-4 text-center">Bombardment Blocks</h1>
+
+    <div id="controlsInfoTop" class="text-gray-700"> 
+        <p><strong class="text-red-600">Player 1 (Red):</strong> A/D (Move), W (Jump), F (Explode), S (Become Block)</p>
+        <p><strong class="text-blue-600">Player 2 (Blue):</strong> Left/Right (Move), Up (Jump), / (Explode), Down Arrow (Become Block)</p>
+    </div>
+
+    <div class="info-panel">
+        <div id="player1Score" class="score-display text-red-600">Red Core: 5 HP</div>
+        <div id="player2Score" class="score-display text-blue-600">Blue Core: 5 HP</div>
+    </div>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="messageBox">Game Over!</div>
+
+    <script>
+        // --- Game Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const player1ScoreDisplay = document.getElementById('player1Score');
+        const player2ScoreDisplay = document.getElementById('player2Score');
+        const messageBox = document.getElementById('messageBox');
+
+        const CANVAS_WIDTH = 1200;
+        const CANVAS_HEIGHT = 600;
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        const BLOCK_SIZE = 30;
+        const GRID_COLS = CANVAS_WIDTH / BLOCK_SIZE;
+        const GRID_ROWS = CANVAS_HEIGHT / BLOCK_SIZE;
+
+        const TARGET_FPS = 60;
+        const TARGET_MS_PER_FRAME = 1000 / TARGET_FPS;
+
+        const GRAVITY_PER_SECOND = 25 * TARGET_FPS; 
+        const MOVE_SPEED_PER_SECOND = 5 * TARGET_FPS; 
+        const JUMP_VELOCITY = -500; 
+
+        const PLAYER_WIDTH = BLOCK_SIZE * 0.8;
+        const PLAYER_HEIGHT = BLOCK_SIZE * 0.8;
+        const CORE_MAX_HEALTH = 5;
+        const EXPLOSION_RADIUS = BLOCK_SIZE * 2.5;
+        const SUPER_EXPLOSION_RADIUS = BLOCK_SIZE * 3; 
+        const BLOCK_MAX_HEALTH = 2; 
+
+        let players = [];
+        let castles = {
+            red: { blocks: [], core: null, spawnX: BLOCK_SIZE * 2, color: 'crimson', damagedColor: '#A52A2A', coreColor: 'lightcoral' }, 
+            blue: { blocks: [], core: null, spawnX: CANVAS_WIDTH - BLOCK_SIZE * 3, color: 'royalblue', damagedColor: '#4169E1', coreColor: 'lightblue' } 
+        };
+        let explosions = [];
+        let keys = {};
+        let gameState = 'playing'; 
+        let particles = []; 
+        
+        let activePowerUp = null;
+        let powerUpSpawnTimer = 3000; 
+        const POWERUP_SPAWN_DELAY = 10000; 
+        const POWERUP_SIZE = BLOCK_SIZE * 0.7;
+        const POWERUP_TYPES = ['wallMaker', 'superBomb', 'starPower'];
+
+
+        const castleTemplateHeight = 10;
+        const castleTemplateWidth = 10;
+        const redMazeTemplate = [
+            [1, 1, 1, 1, 1, 2, 1, 1, 1, 1], [1, 0, 0, 0, 1, 1, 0, 0, 0, 1], [1, 0, 1, 0, 1, 1, 0, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 1, 0, 1], [1, 1, 1, 1, 1, 0, 1, 1, 0, 1], [1, 0, 0, 0, 1, 0, 1, 0, 0, 1], 
+            [1, 0, 1, 0, 1, 0, 1, 0, 0, 1], [1, 0, 1, 1, 1, 0, 1, 1, 1, 1], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+        const blueMazeTemplate = [
+            [1, 1, 1, 1, 1, 1, 2, 1, 1, 1], [1, 0, 0, 0, 0, 1, 1, 0, 0, 1], [1, 0, 1, 1, 0, 1, 0, 0, 1, 1],
+            [1, 0, 1, 0, 0, 0, 0, 1, 0, 1], [1, 0, 1, 1, 0, 1, 1, 1, 0, 1], [1, 0, 0, 1, 0, 1, 0, 0, 0, 1], 
+            [1, 0, 0, 1, 0, 1, 0, 1, 0, 1], [1, 1, 1, 1, 0, 1, 1, 1, 0, 1], [1, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+        
+        let lastTime = 0;
+        let accumulator = 0;
+
+        function createParticle(x, y, color, count, speedRange, sizeRange, lifeRangeMs, particleGravityPerSecond = 0.1 * TARGET_FPS, floaty = false) {
+            for (let i = 0; i < count; i++) {
+                const lifeMs = Math.random() * (lifeRangeMs.max - lifeRangeMs.min) + lifeRangeMs.min;
+                particles.push({
+                    x: x, y: y,
+                    velocityX: (Math.random() - 0.5) * (Math.random() * (speedRange.max - speedRange.min) + speedRange.min),
+                    velocityY: (Math.random() - 0.5) * (Math.random() * (speedRange.max - speedRange.min) + speedRange.min) - (floaty ? Math.random() * 1.5 : 0),
+                    size: Math.random() * (sizeRange.max - sizeRange.min) + sizeRange.min,
+                    color: color, lifeMs: lifeMs, initialLifeMs: lifeMs, 
+                    gravity: floaty ? 0 : particleGravityPerSecond, alpha: 1
+                });
+            }
+        }
+
+        function createParticleEffect(type, x, y, baseColor, teamForBlockColor) {
+            const ms = (frames) => frames * TARGET_MS_PER_FRAME;
+            switch (type) {
+                case 'playerExplosion':
+                    createParticle(x, y, baseColor, 30, { min: 1, max: 7 }, { min: 2, max: 5 }, { min: ms(20), max: ms(40) }, 0.05 * TARGET_FPS);
+                    createParticle(x, y, 'orange', 20, { min: 2, max: 8 }, { min: 3, max: 6 }, { min: ms(30), max: ms(50) }, 0.05 * TARGET_FPS);
+                    createParticle(x, y, 'yellow', 15, { min: 1, max: 5 }, { min: 1, max: 3 }, { min: ms(25), max: ms(45) }, 0.02 * TARGET_FPS);
+                    break;
+                case 'superBombActivation': 
+                    createParticle(x, y, baseColor, 40, { min: 2, max: 10 }, { min: 3, max: 7 }, { min: ms(30), max: ms(60) }, 0.03 * TARGET_FPS);
+                    createParticle(x, y, 'white', 30, { min: 3, max: 12 }, { min: 4, max: 8 }, { min: ms(40), max: ms(70) }, 0.02 * TARGET_FPS);
+                    createParticle(x, y, 'gold', 20, { min: 1, max: 6 }, { min: 2, max: 5 }, { min: ms(35), max: ms(65) }, 0.01 * TARGET_FPS);
+                    break;
+                case 'blockDamage':
+                    createParticle(x, y, baseColor, 8, { min: 0.5, max: 2.5 }, { min: 1, max: 3 }, { min: ms(10), max: ms(25) }, 0.1 * TARGET_FPS);
+                    break;
+                case 'blockDestroy':
+                    const originalBlockColor = castles[teamForBlockColor]?.color || baseColor;
+                    createParticle(x, y, originalBlockColor, 25, { min: 1, max: 4 }, { min: 2, max: 5 }, { min: ms(20), max: ms(40) }, 0.15 * TARGET_FPS);
+                    break;
+                case 'coreDamage':
+                    createParticle(x, y, 'yellow', 20, { min: 1, max: 3 }, { min: 3, max: 6 }, { min: ms(30), max: ms(60) }, 0, true); 
+                    createParticle(x, y, baseColor, 10, { min: 0.5, max: 2 }, { min: 1, max: 4 }, { min: ms(20), max: ms(40) }, 0.05 * TARGET_FPS);
+                    break;
+                case 'powerUpCollect':
+                     createParticle(x, y, baseColor, 25, {min: 1, max: 4}, {min:2, max:5}, {min:ms(20), max:ms(40)}, 0.05 * TARGET_FPS, true); 
+                    break;
+                case 'starPowerAura': 
+                    createParticle(x, y, 'gold', 1, {min: 0.5, max: 1.5}, {min: 1, max: 3}, {min: ms(15), max: ms(30)}, 0, true); 
+                    createParticle(x, y, 'white', 1, {min: 0.3, max: 1}, {min: 1, max: 2}, {min: ms(10), max: ms(25)}, 0, true); 
+                    break;
+            }
+        }
+        
+        function updateParticles(deltaTime) {
+            const dtSeconds = deltaTime / 1000; 
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.velocityX * dtSeconds * TARGET_FPS; 
+                p.y += p.velocityY * dtSeconds * TARGET_FPS;
+                p.velocityY += p.gravity * dtSeconds; 
+                p.lifeMs -= deltaTime;
+                p.alpha = Math.max(0, p.lifeMs / p.initialLifeMs);
+                if (p.lifeMs <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles() {
+            for (const p of particles) {
+                ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+            }
+            ctx.globalAlpha = 1.0; 
+        }
+
+        function snapToGrid(value) { return Math.floor(value / BLOCK_SIZE) * BLOCK_SIZE; }
+        function AABBCollision(rect1, rect2) { 
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        function circleRectCollision(circle, rect) { 
+            let testX = circle.x; let testY = circle.y;
+            if (circle.x < rect.x) testX = rect.x;
+            else if (circle.x > rect.x + rect.width) testX = rect.x + rect.width;
+            if (circle.y < rect.y) testY = rect.y;
+            else if (circle.y > rect.y + rect.height) testY = rect.y + rect.height;
+            const distX = circle.x - testX; const distY = circle.y - testY;
+            return Math.sqrt((distX * distX) + (distY * distY)) <= circle.radius;
+        }
+
+        function spawnNewPowerUp() {
+            const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+            const minSpawnCol = Math.floor(GRID_COLS * 0.35); 
+            const maxSpawnCol = Math.floor(GRID_COLS * 0.65) -1 ; 
+            let spawnX, spawnY, validSpawn = false, attempts = 0;
+            while(!validSpawn && attempts < 20) { 
+                const randomCol = Math.floor(Math.random() * (maxSpawnCol - minSpawnCol + 1)) + minSpawnCol;
+                spawnX = randomCol * BLOCK_SIZE + (BLOCK_SIZE - POWERUP_SIZE) / 2; 
+                const minRow = Math.floor(GRID_ROWS * 0.3); const maxRow = GRID_ROWS - 4;
+                const randomRow = Math.floor(Math.random() * (maxRow - minRow + 1)) + minRow;
+                spawnY = randomRow * BLOCK_SIZE + (BLOCK_SIZE - POWERUP_SIZE) / 2;
+                const powerUpRect = { x: spawnX, y: spawnY, width: POWERUP_SIZE, height: POWERUP_SIZE };
+                let occupied = false;
+                const allBlocksAndCores = castles.red.blocks.concat(castles.blue.blocks, castles.red.core, castles.blue.core).filter(Boolean);
+                for (const item of allBlocksAndCores) {
+                    if(AABBCollision(powerUpRect, {x: item.x, y: item.y, width: BLOCK_SIZE, height: BLOCK_SIZE})){ occupied = true; break; }
+                }
+                if(!occupied) validSpawn = true; attempts++;
+            }
+            if(validSpawn) activePowerUp = { x: spawnX, y: spawnY, type: type, color: 'gold', size: POWERUP_SIZE };
+            else powerUpSpawnTimer = 100 * TARGET_MS_PER_FRAME; 
+        }
+
+        function applyPowerUpEffect(collectingPlayer, powerUp) {
+            const { type, x: powerUpX, y: powerUpY } = powerUp; 
+            createParticleEffect('powerUpCollect', powerUpX + POWERUP_SIZE / 2, powerUpY + POWERUP_SIZE / 2, 'gold');
+
+            switch (type) {
+                case 'wallMaker':
+                    const wallColumnCenterX = snapToGrid(powerUpX + POWERUP_SIZE / 2); 
+                    const columnsToAffect = [wallColumnCenterX - BLOCK_SIZE, wallColumnCenterX, wallColumnCenterX + BLOCK_SIZE];
+                    const otherPlayerWall = players.find(p => p.team !== collectingPlayer.team);
+                    for (const colX of columnsToAffect) {
+                        if (colX < 0 || colX >= CANVAS_WIDTH) continue; 
+                        for (let rowY = BLOCK_SIZE; rowY < CANVAS_HEIGHT - BLOCK_SIZE; rowY += BLOCK_SIZE) {
+                            if ((castles.red.core && castles.red.core.x === colX && castles.red.core.y === rowY) ||
+                                (castles.blue.core && castles.blue.core.x === colX && castles.blue.core.y === rowY)) continue;
+                            const cellRect = { x: colX, y: rowY, width: BLOCK_SIZE, height: BLOCK_SIZE };
+                            if (otherPlayerWall && AABBCollision(otherPlayerWall, cellRect)) otherPlayerWall.respawn();
+                            castles.red.blocks = castles.red.blocks.filter(b => !(b.x === colX && b.y === rowY));
+                            castles.blue.blocks = castles.blue.blocks.filter(b => !(b.x === colX && b.y === rowY));
+                            castles[collectingPlayer.team].blocks.push(createBlock(colX, rowY, castles[collectingPlayer.team].color, collectingPlayer.team));
+                        }
+                    }
+                    collectingPlayer.respawn(); 
+                    break;
+                case 'superBomb':
+                    collectingPlayer.hasSuperBomb = true;
+                    break;
+                case 'starPower':
+                    collectingPlayer.hasStarPower = true;
+                    collectingPlayer.starPowerTimer = 10 * 1000; 
+                    collectingPlayer.explodeCooldownTimer = 0; 
+                    collectingPlayer.placeBlockCooldownTimer = 0;
+                    break;
+            }
+            activePowerUp = null; 
+            powerUpSpawnTimer = POWERUP_SPAWN_DELAY; 
+        }
+
+        function drawPowerUp() {
+            if (activePowerUp) {
+                ctx.fillStyle = activePowerUp.color;
+                ctx.fillRect(activePowerUp.x, activePowerUp.y, activePowerUp.size, activePowerUp.size);
+                ctx.fillStyle = 'black'; ctx.font = `${activePowerUp.size * 0.6}px Arial`; 
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                let symbol = '?';
+                if(activePowerUp.type === 'wallMaker') symbol = 'W';
+                else if(activePowerUp.type === 'superBomb') symbol = 'SB';
+                else if(activePowerUp.type === 'starPower') symbol = 'SP'; 
+                ctx.fillText(symbol, activePowerUp.x + activePowerUp.size / 2, activePowerUp.y + activePowerUp.size / 2 + 2);
+            }
+        }
+
+        function createPlayer(team) {
+            return {
+                x: castles[team].spawnX, y: CANVAS_HEIGHT - BLOCK_SIZE - PLAYER_HEIGHT,
+                width: PLAYER_WIDTH, height: PLAYER_HEIGHT, velocityX: 0, velocityY: 0,
+                isJumping: false, onGround: false, team: team, color: castles[team].color,
+                hasSuperBomb: false, 
+                hasStarPower: false, 
+                starPowerTimer: 0,   
+                explodeCooldownTimer: 0, 
+                placeBlockCooldownTimer: 0, 
+                starPowerAuraFrame: 0, 
+                draw() { 
+                    ctx.fillStyle = this.color; 
+                    if (this.hasSuperBomb) {
+                        ctx.strokeStyle = 'white'; ctx.lineWidth = 3;
+                        ctx.strokeRect(this.x - 2, this.y - 2, this.width + 4, this.height + 4);
+                        ctx.lineWidth = 1; 
+                    }
+                    if (this.hasStarPower) { 
+                        const auraRadius = this.width * 0.8 + Math.sin(this.starPowerAuraFrame * 0.1) * 3; 
+                        ctx.beginPath();
+                        ctx.arc(this.x + this.width / 2, this.y + this.height / 2, auraRadius, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255, 255, 0, ${0.3 + Math.sin(this.starPowerAuraFrame * 0.15) * 0.1})`; 
+                        ctx.fill();
+                        if (this.starPowerAuraFrame % 5 === 0) { 
+                             createParticleEffect('starPowerAura', this.x + this.width/2, this.y + this.height/2, 'gold');
+                        }
+                    }
+                    ctx.fillRect(this.x, this.y, this.width, this.height); 
+                    ctx.strokeStyle = 'black'; ctx.beginPath();
+                    ctx.moveTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x + this.width / 2, this.y - 5);
+                    ctx.stroke();
+                },
+                update(deltaTime) { 
+                    const dtSeconds = deltaTime / 1000;
+
+                    this.velocityY += GRAVITY_PER_SECOND * dtSeconds;
+                    
+                    const previousX = this.x;
+                    this.x += this.velocityX * dtSeconds;
+                    this.resolveHorizontalCollisions(previousX);
+
+                    const previousY = this.y;
+                    this.y += this.velocityY * dtSeconds;
+                    this.resolveVerticalCollisions(previousY);
+                    
+                    if (Math.abs(this.velocityX) < 0.1) this.velocityX = 0;
+                    if (this.x < 0) { this.x = 0; if(this.velocityX < 0) this.velocityX = 0; }
+                    if (this.x + this.width > CANVAS_WIDTH) { this.x = CANVAS_WIDTH - this.width; if(this.velocityX > 0) this.velocityX = 0;}
+                    if (this.y < 0) { this.y = 0; if (this.velocityY < 0) this.velocityY = 0; }
+                    
+                    this.starPowerAuraFrame++; 
+
+                    if (this.hasStarPower) {
+                        this.starPowerTimer -= deltaTime;
+                        if (this.starPowerTimer <= 0) {
+                            this.hasStarPower = false;
+                            this.starPowerTimer = 0;
+                        }
+                    }
+                    if (this.explodeCooldownTimer > 0) this.explodeCooldownTimer -= deltaTime;
+                    if (this.placeBlockCooldownTimer > 0) this.placeBlockCooldownTimer -= deltaTime;
+
+                    if (activePowerUp) {
+                        const playerRect = { x: this.x, y: this.y, width: this.width, height: this.height };
+                        const powerUpRect = { x: activePowerUp.x, y: activePowerUp.y, width: activePowerUp.size, height: activePowerUp.size };
+                        if (AABBCollision(playerRect, powerUpRect)) applyPowerUpEffect(this, activePowerUp); 
+                    }
+                },
+                resolveHorizontalCollisions(previousX) { 
+                    const allObstacles = castles.red.blocks.concat(castles.blue.blocks).concat([castles.red.core, castles.blue.core].filter(c => c));
+                    for (const obstacle of allObstacles) {
+                        if (!obstacle) continue;
+                        let isEnemyEntity = false;
+                        if (obstacle.team !== undefined && (obstacle.health !== undefined || obstacle.isCore)) isEnemyEntity = (obstacle.team !== this.team);
+                        else if (obstacle.color) isEnemyEntity = (obstacle.color !== castles[this.team].color && obstacle.color !== castles[this.team].damagedColor);
+                        if (!isEnemyEntity) continue;
+                        
+                        const playerRect = { x: this.x, y: this.y, width: this.width, height: this.height };
+                        const obstacleRect = { x: obstacle.x, y: obstacle.y, width: BLOCK_SIZE, height: BLOCK_SIZE };
+
+                        if (AABBCollision(playerRect, obstacleRect)) {
+                            if (this.velocityX > 0) { 
+                                this.x = obstacle.x - this.width;
+                            } else if (this.velocityX < 0) { 
+                                this.x = obstacle.x + BLOCK_SIZE;
+                            }
+                            this.velocityX = 0;
+                        }
+                    }
+                },
+                resolveVerticalCollisions(previousY) { 
+                    this.onGround = false;
+                    const allPlatformsAndObstacles = castles.red.blocks.concat(castles.blue.blocks).concat([castles.red.core, castles.blue.core].filter(c => c));
+                    for (const entity of allPlatformsAndObstacles) {
+                        if (!entity) continue;
+                        const playerRect = { x: this.x, y: this.y, width: this.width, height: this.height };
+                        const entityRect = { x: entity.x, y: entity.y, width: BLOCK_SIZE, height: BLOCK_SIZE };
+
+                        if (AABBCollision(playerRect, entityRect)) {
+                            if (this.velocityY > 0) { 
+                                if ((previousY + this.height) <= entity.y + 0.1) { 
+                                    this.y = entity.y - this.height; this.velocityY = 0; this.isJumping = false; this.onGround = true;
+                                }
+                            } else if (this.velocityY < 0) { 
+                                let isEnemyEntity = false;
+                                if (entity.team !== undefined && (entity.health !== undefined || entity.isCore)) isEnemyEntity = (entity.team !== this.team);
+                                else if (entity.color) isEnemyEntity = (entity.color !== castles[this.team].color && entity.color !== castles[this.team].damagedColor);
+                                
+                                if (isEnemyEntity) {
+                                     if (previousY >= (entity.y + BLOCK_SIZE - 0.1)) { 
+                                        this.y = entity.y + BLOCK_SIZE; this.velocityY = 0; 
+                                     }
+                                }
+                            }
+                        }
+                    }
+                    if (this.y + this.height >= CANVAS_HEIGHT - BLOCK_SIZE) { 
+                        this.y = CANVAS_HEIGHT - BLOCK_SIZE - this.height;
+                        if (this.velocityY > 0) this.velocityY = 0; this.isJumping = false; this.onGround = true;
+                    }
+                },
+                jump() { 
+                    if (this.onGround && !this.isJumping) { this.velocityY = JUMP_VELOCITY; this.isJumping = true; this.onGround = false; }
+                },
+                explode() {
+                    if (this.hasStarPower && this.explodeCooldownTimer > 0) return; 
+
+                    let explosionRadiusToUse = EXPLOSION_RADIUS;
+                    let instaKillBlocksFlag = false;
+                    let particleEffectType = 'playerExplosion';
+
+                    if (this.hasSuperBomb) {
+                        explosionRadiusToUse = SUPER_EXPLOSION_RADIUS;
+                        instaKillBlocksFlag = true;
+                        this.hasSuperBomb = false; 
+                        particleEffectType = 'superBombActivation'; 
+                    }
+                    createParticleEffect(particleEffectType, this.x + this.width / 2, this.y + this.height / 2, this.color);
+                    explosions.push(createExplosion(this.x + this.width / 2, this.y + this.height / 2, this.team, explosionRadiusToUse, instaKillBlocksFlag));
+                    
+                    if (this.hasStarPower) {
+                        this.explodeCooldownTimer = 1000; 
+                    } else {
+                        this.respawn();
+                    }
+                },
+                becomeBlock() { 
+                    if (this.hasStarPower && this.placeBlockCooldownTimer > 0) return;
+
+                    const gridX = snapToGrid(this.x + this.width / 2); const gridY = snapToGrid(this.y + this.height / 2);
+                    if (gridY < BLOCK_SIZE || gridY >= CANVAS_HEIGHT - BLOCK_SIZE) return; 
+                    if ((castles.red.core && castles.red.core.x === gridX && castles.red.core.y === gridY) ||
+                        (castles.blue.core && castles.blue.core.x === gridX && castles.blue.core.y === gridY)) return;
+                    let blockAtLocation = castles.red.blocks.find(b => b.x === gridX && b.y === gridY) || castles.blue.blocks.find(b => b.x === gridX && b.y === gridY);
+                    const otherPlayer = players.find(p => p.team !== this.team);
+                    const placedBlockRect = { x: gridX, y: gridY, width: BLOCK_SIZE, height: BLOCK_SIZE };
+                    let actionTaken = false;
+
+                    if (blockAtLocation) {
+                        if (blockAtLocation.team === this.team) { 
+                            if (blockAtLocation.health === 1) { 
+                                blockAtLocation.health = BLOCK_MAX_HEALTH;
+                                if (otherPlayer && AABBCollision(otherPlayer, placedBlockRect)) otherPlayer.respawn();
+                                actionTaken = true;
+                            }
+                        }
+                    } else { 
+                        const newBlock = createBlock(gridX, gridY, castles[this.team].color, this.team);
+                        castles[this.team].blocks.push(newBlock); 
+                        if (otherPlayer && AABBCollision(otherPlayer, placedBlockRect)) otherPlayer.respawn();
+                        actionTaken = true;
+                    }
+
+                    if(actionTaken){
+                        if(this.hasStarPower){
+                            this.placeBlockCooldownTimer = 250; 
+                        } else {
+                            this.respawn();
+                        }
+                    }
+                },
+                respawn() { 
+                    this.x = castles[this.team].spawnX; this.y = CANVAS_HEIGHT - BLOCK_SIZE - PLAYER_HEIGHT - 10; 
+                    this.velocityX = 0; this.velocityY = 0; this.isJumping = false; this.onGround = true; 
+                }
+            };
+        }
+
+        function createBlock(x, y, teamColor, teamName) { 
+            return {
+                x: x, y: y, width: BLOCK_SIZE, height: BLOCK_SIZE, team: teamName, 
+                color: teamColor, health: BLOCK_MAX_HEALTH, isDestructible: true,
+                draw() {
+                    let currentBlockDisplayColor;
+                    if (this.health === 1) currentBlockDisplayColor = castles[this.team].damagedColor;
+                    else currentBlockDisplayColor = castles[this.team].color;
+                    ctx.fillStyle = currentBlockDisplayColor;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.strokeRect(this.x, this.y, this.width, this.height);
+                    if (this.health === 1) {
+                        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; ctx.beginPath();
+                        ctx.moveTo(this.x + 5, this.y + 5); ctx.lineTo(this.x + this.width - 5, this.y + this.height - 5);
+                        ctx.moveTo(this.x + this.width - 5, this.y + 5); ctx.lineTo(this.x + 5, this.y + this.height - 5);
+                        ctx.stroke(); ctx.lineWidth = 1; 
+                    }
+                },
+                takeDamage() {
+                    if (!this.isDestructible || this.health <= 0) return false; 
+                    this.health--;
+                    if (this.health === 1) {
+                        createParticleEffect('blockDamage', this.x + this.width / 2, this.y + this.height / 2, castles[this.team].damagedColor, this.team);
+                        return false; 
+                    } else if (this.health <= 0) {
+                        createParticleEffect('blockDestroy', this.x + this.width / 2, this.y + this.height / 2, this.color, this.team);
+                        return true; 
+                    }
+                    return false; 
+                }
+            };
+        }
+        function createCore(x, y, team) { 
+            return {
+                x: x, y: y, width: BLOCK_SIZE, height: BLOCK_SIZE, team: team, isCore: true,
+                color: castles[team].coreColor, health: CORE_MAX_HEALTH,
+                draw() {
+                    ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.width, this.height);
+                    ctx.shadowColor = 'yellow'; ctx.shadowBlur = 15; ctx.fillStyle = this.color; 
+                    ctx.fillRect(this.x, this.y, this.width, this.height); ctx.shadowBlur = 0; 
+                    ctx.fillStyle = 'black'; ctx.font = `${BLOCK_SIZE * 0.5}px Arial`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(this.health, this.x + this.width / 2, this.y + this.height / 2);
+                },
+                takeDamage() {
+                    if (gameState === 'gameOver') return; this.health--;
+                    createParticleEffect('coreDamage', this.x + this.width / 2, this.y + this.height / 2, this.color);
+                    if (this.health <= 0) {
+                        this.health = 0; gameState = 'gameOver';
+                        const winner = this.team === 'red' ? 'Blue' : 'Red';
+                        messageBox.textContent = `${winner} Team Wins!`; messageBox.style.display = 'block';
+                        setTimeout(initGame, 5000); 
+                    }
+                    updateScoreDisplays();
+                }
+            };
+        }
+
+        function createExplosion(x, y, team, radius = EXPLOSION_RADIUS, instaKillBlocks = false) { 
+            return {
+                x: x, y: y, radius: radius, team: team, instaKillBlocks: instaKillBlocks,
+                durationMs: 30 * TARGET_MS_PER_FRAME, 
+                currentTimeElapsedMs: 0, 
+                hasAppliedDamage: false,
+                draw() {
+                    const progress = this.currentTimeElapsedMs / this.durationMs;
+                    const currentRadius = this.radius * Math.sin(progress * Math.PI); 
+                    ctx.beginPath(); ctx.arc(this.x, this.y, currentRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 165, 0, ${1 - progress * 0.8})`; ctx.fill();
+                },
+                update(deltaTime) {
+                    this.currentTimeElapsedMs += deltaTime;
+                    if (this.currentTimeElapsedMs >= (5 * TARGET_MS_PER_FRAME) && !this.hasAppliedDamage) { 
+                        this.applyDamage(); this.hasAppliedDamage = true; 
+                    } 
+                    return this.currentTimeElapsedMs >= this.durationMs; 
+                },
+                applyDamage() {
+                    const enemyTeamName = this.team === 'red' ? 'blue' : 'red';
+                    castles[enemyTeamName].blocks = castles[enemyTeamName].blocks.filter(block => {
+                        if (circleRectCollision(this, block)) {
+                            if (this.instaKillBlocks) {
+                                createParticleEffect('blockDestroy', block.x + block.width / 2, block.y + block.height / 2, block.color, block.team);
+                                return false; 
+                            }
+                            return !block.takeDamage(); 
+                        }
+                        return true;
+                    });
+                    const enemyCore = castles[enemyTeamName].core;
+                    if (enemyCore && circleRectCollision(this, enemyCore)) enemyCore.takeDamage();
+                    castles[this.team].blocks = castles[this.team].blocks.filter(block => {
+                         if (block.team === this.team && circleRectCollision(this, block)) { 
+                            if (this.instaKillBlocks) {
+                                createParticleEffect('blockDestroy', block.x + block.width / 2, block.y + block.height / 2, block.color, block.team);
+                                return false;
+                            }
+                            return !block.takeDamage();
+                        }
+                        return true;
+                    });
+                    players.forEach(player => {
+                        if (player.team !== this.team) { 
+                            const playerRect = { x: player.x, y: player.y, width: player.width, height: player.height };
+                            if (circleRectCollision(this, playerRect)) player.respawn();
+                        }
+                    });
+                }
+            };
+        }
+
+        function initGame() { 
+            gameState = 'playing'; messageBox.style.display = 'none';
+            players = []; explosions = []; particles = []; activePowerUp = null; 
+            powerUpSpawnTimer = 3000; 
+            lastTime = 0; 
+            accumulator = 0;
+            
+            const player1 = createPlayer('red'); const player2 = createPlayer('blue');
+            players.push(player1, player2);
+            ['red', 'blue'].forEach(team => {
+                castles[team].blocks = [];
+                const castleStartX = (team === 'red') ? BLOCK_SIZE * 3 : CANVAS_WIDTH - BLOCK_SIZE * (castleTemplateWidth + 3);
+                const template = (team === 'red') ? redMazeTemplate : blueMazeTemplate;
+                const castleBaseY = CANVAS_HEIGHT - (castleTemplateHeight + 1) * BLOCK_SIZE; 
+                for (let r = 0; r < castleTemplateHeight; r++) {
+                    for (let c = 0; c < castleTemplateWidth; c++) {
+                        const currentX = castleStartX + c * BLOCK_SIZE; const currentY = castleBaseY + r * BLOCK_SIZE; 
+                        if (template[r][c] === 1) castles[team].blocks.push(createBlock(currentX, currentY, castles[team].color, team));
+                        else if (template[r][c] === 2) castles[team].core = createCore(currentX, currentY, team);
+                    }
+                }
+                if (!castles[team].core) {
+                    console.error(`Core not placed!`);
+                    const defaultCoreC = Math.floor(castleTemplateWidth / 2); const defaultCoreR = castleTemplateHeight - 2; 
+                    castles[team].core = createCore(castleStartX + defaultCoreC * BLOCK_SIZE, castleBaseY + defaultCoreR * BLOCK_SIZE, team);
+                }
+            });
+            updateScoreDisplays();
+        }
+
+        window.addEventListener('keydown', (e) => { 
+            keys[e.key.toLowerCase()] = true;
+            if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', 'f', '/', 'k', 'l'].includes(e.key.toLowerCase())) e.preventDefault();
+        });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        function handleInput() { 
+            if (gameState === 'gameOver') return;
+
+            if (keys['a']) players[0].velocityX = -MOVE_SPEED_PER_SECOND; 
+            else if (keys['d']) players[0].velocityX = MOVE_SPEED_PER_SECOND;
+            else players[0].velocityX = 0; 
+
+            if (keys['w']) players[0].jump();
+            if (keys['f']) { players[0].explode(); keys['f'] = false; } 
+            if (keys['s']) { players[0].becomeBlock(); keys['s'] = false; } 
+            
+            if (keys['arrowleft']) players[1].velocityX = -MOVE_SPEED_PER_SECOND;
+            else if (keys['arrowright']) players[1].velocityX = MOVE_SPEED_PER_SECOND;
+            else players[1].velocityX = 0; 
+
+
+            if (keys['arrowup']) players[1].jump();
+            if (keys['/']) { players[1].explode(); keys['/'] = false; } 
+            if (keys['arrowdown']) { players[1].becomeBlock(); keys['arrowdown'] = false; } 
+        }
+
+        function update(deltaTime) { 
+            if (gameState === 'gameOver') return; 
+            handleInput(); 
+            players.forEach(player => player.update(deltaTime)); 
+            explosions = explosions.filter(exp => !exp.update(deltaTime)); 
+            updateParticles(deltaTime); 
+
+            if (!activePowerUp) {
+                powerUpSpawnTimer -= deltaTime;
+                if (powerUpSpawnTimer <= 0) {
+                    spawnNewPowerUp();
+                }
+            } 
+        }
+
+        function draw() { 
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx.fillStyle = '#8B4513'; ctx.fillRect(0, CANVAS_HEIGHT - BLOCK_SIZE, CANVAS_WIDTH, BLOCK_SIZE);
+            [castles.red, castles.blue].forEach(castle => {
+                castle.blocks.forEach(block => block.draw());
+                if (castle.core) castle.core.draw();
+            });
+            drawPowerUp(); drawParticles(); 
+            players.forEach(player => player.draw());
+            explosions.forEach(exp => exp.draw());
+        }
+        
+        function updateScoreDisplays() { 
+            player1ScoreDisplay.textContent = `Red Core: ${castles.red.core ? castles.red.core.health : 'X'} HP`;
+            player2ScoreDisplay.textContent = `Blue Core: ${castles.blue.core ? castles.blue.core.health : 'X'} HP`;
+        }
+
+        function gameLoop(currentTime) { 
+            if (lastTime === 0) { 
+                lastTime = currentTime;
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            accumulator += deltaTime;
+            const maxAccumulatedTime = 5 * TARGET_MS_PER_FRAME; 
+            if (accumulator > maxAccumulatedTime) {
+                accumulator = maxAccumulatedTime;
+            }
+
+            while (accumulator >= TARGET_MS_PER_FRAME) {
+                update(TARGET_MS_PER_FRAME); 
+                accumulator -= TARGET_MS_PER_FRAME;
+            }
+            
+            draw(); 
+            requestAnimationFrame(gameLoop); 
+        }
+        initGame(); 
+        requestAnimationFrame(gameLoop); 
+    </script>
+</body>
+</html>
