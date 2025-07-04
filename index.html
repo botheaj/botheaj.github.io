@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" style="scroll-behavior: smooth;">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AJ Bothe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #ffffff;
+            /* Plain white */
+            color: #111827;
+            /* gray-900 */
+            line-height: 1.6;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-weight: 600;
+            color: #1f2937;
+            /* gray-800 */
+        }
+
+        a {
+            color: #1d4ed8;
+            /* blue-700 */
+            text-decoration: underline;
+        }
+
+        a:hover {
+            color: #2563eb;
+            /* blue-600 */
+        }
+
+        hr {
+            border-top: 1px solid #e5e7eb;
+            /* gray-200 */
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .content-section {
+            margin-bottom: 3rem;
+            /* More spacing between main sections */
+        }
+
+        .entry {
+            margin-bottom: 2rem;
+            /* Spacing between individual thoughts/projects */
+        }
+
+        .post-tag {
+            display: inline-block;
+            background-color: #f0f9ff;
+            /* sky-50 */
+            color: #0c4a6e;
+            /* sky-800 */
+            font-size: 0.75rem;
+            /* text-xs */
+            font-weight: 500;
+            padding: 0.125rem 0.5rem;
+            /* py-0.5 px-2 */
+            border-radius: 0.25rem;
+            /* rounded-sm */
+            border: 1px solid #7dd3fc;
+            /* sky-300 */
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+
+<body class="max-w-2xl mx-auto px-4 py-8 md:py-16">
+
+    <header class="mb-12 text-center">
+        <h1 class="text-4xl md:text-5xl">AJ Bothe</h1>
+        <p class="mt-3 text-lg text-gray-600">
+            Sometimes I make stuff
+        </p>
+        <nav class="mt-5 text-base">
+            <a href="#thoughts" class="mx-2">Thoughts</a>
+            <a href="#projects" class="mx-2">Projects</a>
+            <a href="https://github.com/botheaj" target="_blank" class="mx-2">Github</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="thoughts" class="content-section">
+            <h2 class="text-3xl mb-6">Thoughts...</h2>
+            <!-- COPY THIS -->
+        <!-- 
+            <article class="entry" id="">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">June 01, 2025</p>
+                <h3 class="text-xl mt-1">TITLE<a href="#" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    body
+                </p>
+            </article> 
+        -->
+
+        <article class="entry" id="vibe-coding-unlocks-me">
+            <p class="text-xs text-gray-500 uppercase tracking-wider">June 07, 2025</p>
+
+            <h3 class="text-xl mt-1">Vibe Coding Unlocks Me<a href="#vibe-coding-unlocks-me" class="post-tag"><i class="fas fa-link"></i></a></h3>
+            <p class="mt-1 text-gray-700">
+                I've never been great at coding. I can do it, but I'm not fast and I'm not great at it. Vibe coding unlocks me by taking out the extra
+                steps it takes to get from idea to POC to MVP. I no longer have to iterate over the same block of code 700 times before it does what I want. 
+                Is it a perfect solution? Absolutely not! But it's pretty dang good for what I'm using it for. 
+            </p>
+        </article> 
+
+            <article class="entry" id="i-use-ai-to-help-me-write-these-thoughts">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">June 06, 2025</p>
+                <h3 class="text-xl mt-1">I use AI to help me write these...<a href="#i-use-ai-to-help-me-write-these-thoughts" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    ...and that's okay. Because sometimes I have a thought and words are hard. I use the AI to help me
+                    make the words more clear and meaningful.
+                    I often find more insight that I maybe didn't consider before. I treat AI like a friend I can bounce
+                    an idea off of. We have a conversation and I learn from it.
+                    I think that's a good thing. Ironically, I didn't use AI to help me write this thought.
+                </p>
+            </article>
+
+            <article class="entry" id="the-value-of-good-enough">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">June 01, 2025</p>
+                <h3 class="text-xl mt-1">The Value of "Good Enough"<a href="#the-value-of-good-enough" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    Sometimes, striving for perfection is the enemy of done. In many engineering contexts, "good enough"
+                    for now, with a clear path for iteration, is far more valuable than a theoretically perfect solution
+                    that never ships. This is especially true for internal tools or early-stage product features.
+                </p>
+            </article>
+
+            <article class="entry" id="kubernetes-is-hard">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">May 20, 2025</p>
+                <h3 class="text-xl mt-1">Kubernetes: Complexity vs. Capability<a href="#kubernetes-is-hard" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    Kubernetes is undeniably powerful, but its complexity is non-trivial. For smaller projects or teams,
+                    the operational overhead can outweigh the benefits. It's crucial to assess if you *really* need that
+                    level of orchestration or if a simpler PaaS or even a well-managed set of serverless functions (like
+                    Cloud Run) would suffice.
+                </p>
+            </article>
+
+            <hr />
+        </section>
+
+        <section id="projects" class="content-section">
+            <h2 class="text-3xl mb-6">Projects</h2>
+
+                        <!-- COPY THIS -->
+
+            <!-- 
+            <article class="entry">
+                <h3 class="text-xl">TITLE</h3>
+                <p class="mt-1 text-gray-700">
+                    CONTENTGOHERE
+                </p>
+                <p class="mt-2"><a href="#" target="_blank">Play the game</a></p>
+                <p class="mt-2"><a href="#" target="_blank">See the code on Github</a></p>
+            </article> 
+            -->
+            <article class="entry" id="bombardment-blocksmp">
+                <h3 class="text-xl">Multiplayer Version of Bombardment Blocks<a href="#bombardment-blocksmp" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    I took my old Bombardment Blocks game and made it have proper multiplayer. </p>
+                <p class="mt-2"><a href="https://github.com/botheaj/bombardmentblocksmp" target="_blank">See the code on Github</a></p>
+            </article>
+
+            <article class="entry" id="multidrawer">
+                <h3 class="text-xl">Multidrawer<a href="#multidrawer" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    A vibe-coded multiplayer drawing game - local hosting required. Instructions are in the <a href="https://github.com/botheaj/multidrawer" target="_blank">README</a>.
+                </p>
+                <p class="mt-2"><a href="https://github.com/botheaj/multidrawer" target="_blank">See the code on Github</a></p>
+            </article> 
+
+            <article class="entry" id="bombardment-blocks">
+                <h3 class="text-xl">Vibe Weekend - May 31, 2025<a href="#bombardment-blocks" class="post-tag"><i class="fas fa-link"></i></a></h3>
+                <p class="mt-1 text-gray-700">
+                    This weekend, I vibe-coded an exploding block-building vs game. </p>
+                <p class="mt-2"><a href="games/bombardmentblocks/v1/bombardmentblocks.html" target="_blank">Play the game</a></p>
+                <p class="mt-2"><a href="https://gist.github.com/botheaj/05826c4744805f8a4629b27252a40f29"
+                        target="_blank">See the code on Github</a></p>
+            </article>
+        </section>
+    </main>
+
+    <footer class="text-center mt-12 pt-6 border-t border-gray-200">
+        <p class="text-sm text-gray-500">&copy; <span id="currentYear"></span> AJ Bothe</p>
+    </footer>
+
+    <script>
+        // Super simple script to set the current year in the footer.
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+    </script>
+
+</body>
+
+</html>
